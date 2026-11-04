@@ -1,7 +1,10 @@
 package uz.dostonbek.namozly.feature.mosques
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +20,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -103,7 +106,7 @@ data class MosquesUiState(
 @HiltViewModel
 class MosquesViewModel @Inject constructor(
     private val repository: MosqueRepository,
-    locationRepository: LocationRepository,
+    private val locationRepository: LocationRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(MosquesUiState())
     val uiState: StateFlow<MosquesUiState> = _state.asStateFlow()
@@ -128,10 +131,22 @@ class MosquesViewModel @Inject constructor(
         }
     }
 
+    fun onLocationPermissionGranted() {
+        viewModelScope.launch {
+            locationRepository.refreshFromDevice()
+        }
+    }
+
     private suspend fun loadNearby(point: GeoPoint) {
         _state.update { it.copy(nearbyLoading = true, nearbyError = false) }
         val result = repository.nearby(point, 5000)
-        _state.update { it.copy(nearby = result.getOrDefault(emptyList()), nearbyLoading = false, nearbyError = result.isFailure) }
+        _state.update {
+            it.copy(
+                nearby = result.getOrDefault(emptyList()),
+                nearbyLoading = false,
+                nearbyError = result.isFailure && it.nearby.isEmpty(),
+            )
+        }
     }
 
     fun retry() = viewModelScope.launch { loadNearby(_state.value.center) }
@@ -145,7 +160,16 @@ private fun openDirections(context: android.content.Context, m: Mosque) {
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
 }
 
-/** Dizayn: Masjidlar.dc.html — to'liq ekran xarita + pastdagi masjid kartasi. Xarita kaliti bo'lmasa — ro'yxat. */
+private fun countryCenter(country: String?, mosques: List<Mosque>): GeoPoint? {
+    if (country == null) return null
+    val ms = mosques.filter { it.country.equals(country, ignoreCase = true) }
+    if (ms.isEmpty()) return null
+    val avgLat = ms.map { it.point.latitude }.average()
+    val avgLon = ms.map { it.point.longitude }.average()
+    return GeoPoint(avgLat, avgLon)
+}
+
+/** Dizayn: Masjidlar — to'liq ekran xarita + pastdagi masjid kartasi yoki ro'yxat */
 @Composable
 internal fun MosquesScreenRoute(onBack: () -> Unit, onOpenWorld: () -> Unit, viewModel: MosquesViewModel = hiltViewModel()) {
     val t = NamozlyThemeTokens.t
@@ -153,21 +177,35 @@ internal fun MosquesScreenRoute(onBack: () -> Unit, onOpenWorld: () -> Unit, vie
     var query by rememberSaveable { mutableStateOf("") }
     var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
     var zoom by remember { mutableFloatStateOf(14f) }
-    // Standart — ro'yxat; xarita kaliti bo'lsa "Xarita" rejimiga o'tish mumkin.
     var mapMode by rememberSaveable { mutableStateOf(false) }
-    val showMap = mapMode && YandexMapInitializer.isReady
+    val showMap = mapMode
     val context = LocalContext.current
     val list = state.nearby.filter { query.isBlank() || it.name.contains(query.trim(), true) }
     val selected = list.firstOrNull { it.id == selectedId } ?: list.firstOrNull()
 
+    val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.any { it }) {
+            viewModel.onLocationPermissionGranted()
+        }
+    }
+    LaunchedEffect(Unit) {
+        locationLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
     Box(Modifier.fillMaxSize().background(t.bg)) {
         when {
-            state.nearbyLoading -> LoadingBox()
+            state.nearbyLoading && state.nearby.isEmpty() -> LoadingBox()
             state.nearbyError -> EmptyState(Icons.Rounded.CloudOff, stringResource(R.string.error_no_internet), action = stringResource(R.string.common_retry), onAction = { viewModel.retry() }, modifier = Modifier.padding(top = 140.dp))
             list.isEmpty() -> EmptyState(Icons.Rounded.Mosque, stringResource(R.string.mosques_empty), modifier = Modifier.padding(top = 140.dp))
             showMap -> MosqueMap(
-                center = selected?.point ?: state.center, zoom = zoom, mosques = list, clustered = false,
-                onMosqueClick = { selectedId = it.id }, modifier = Modifier.fillMaxSize(),
+                center = selected?.point ?: state.center,
+                zoom = zoom,
+                mosques = list,
+                clustered = false,
+                selectedId = selected?.id,
+                userLocation = state.center,
+                onMosqueClick = { selectedId = it.id },
+                modifier = Modifier.fillMaxSize(),
             )
             else -> LazyColumn(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 150.dp, bottom = 24.dp),
@@ -193,7 +231,7 @@ internal fun MosquesScreenRoute(onBack: () -> Unit, onOpenWorld: () -> Unit, vie
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Chip(stringResource(R.string.mosques_nearest), !showMap) { mapMode = false }
-                if (YandexMapInitializer.isReady) Chip(stringResource(R.string.mosques_map), showMap) { mapMode = true }
+                Chip(stringResource(R.string.mosques_map), showMap) { mapMode = true }
                 Chip(stringResource(R.string.mosques_world), false, onOpenWorld)
             }
         }
@@ -250,7 +288,7 @@ private fun MosqueSheet(m: Mosque, modifier: Modifier, onDirections: () -> Unit)
     }
 }
 
-/** Dizayn: DunyoMasjidlari.dc.html + DunyoXarita.dc.html */
+/** Dizayn: DunyoMasjidlari — ro'yxat va xarita (MarkerCluster bilan) */
 @Composable
 internal fun WorldMosquesScreen(onBack: () -> Unit, viewModel: MosquesViewModel = hiltViewModel()) {
     val t = NamozlyThemeTokens.t
@@ -258,13 +296,15 @@ internal fun WorldMosquesScreen(onBack: () -> Unit, viewModel: MosquesViewModel 
     var mapMode by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var country by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedMosque by remember { mutableStateOf<Mosque?>(null) }
     val context = LocalContext.current
-    val countries = state.world.groupBy { it.country.orEmpty() }.toList().sortedByDescending { it.second.size }.map { it.first }
+    val countries = state.world.mapNotNull { it.country?.takeIf { c -> c.isNotBlank() } }.distinct()
     val filtered = state.world.filter { m ->
-        (country == null || m.country == country) &&
+        (country == null || m.country.equals(country, ignoreCase = true)) &&
             (query.isBlank() || listOfNotNull(m.name, m.city, m.country).any { it.contains(query.trim(), true) })
     }
     val featured = state.world.getOrNull((LocalDate.now().toEpochDay() / 7 % state.world.size.coerceAtLeast(1)).toInt())
+    val selected = selectedMosque ?: filtered.firstOrNull()
     val nf = NumberFormat.getIntegerInstance(Locale.getDefault())
 
     Column(Modifier.fillMaxSize().background(t.bg)) {
@@ -285,23 +325,56 @@ internal fun WorldMosquesScreen(onBack: () -> Unit, viewModel: MosquesViewModel 
             }
         }
         if (state.worldLoading) { LoadingBox(); return@Column }
-        if (mapMode && YandexMapInitializer.isReady) {
+        if (mapMode) {
             Box(Modifier.weight(1f).padding(top = 12.dp)) {
                 MosqueMap(
-                    center = filtered.firstOrNull()?.point?.takeIf { country != null } ?: GeoPoint(30.0, 45.0),
-                    zoom = if (country != null) 4.5f else 2.4f, mosques = filtered, clustered = true,
-                    onMosqueClick = { openDirections(context, it) }, modifier = Modifier.fillMaxSize(),
+                    center = countryCenter(country, filtered) ?: filtered.firstOrNull()?.point ?: GeoPoint(30.0, 45.0),
+                    zoom = if (country != null) 5.5f else 2.5f,
+                    mosques = filtered,
+                    clustered = true,
+                    selectedId = selected?.id,
+                    onMosqueClick = { selectedMosque = it },
+                    modifier = Modifier.fillMaxSize(),
                 )
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)).background(t.surface)
                         .navigationBarsPadding().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    CountryChips(countries, country) { country = it }
-                    DText(country ?: stringResource(R.string.common_all), 16.sp, FontWeight.ExtraBold, t.strong)
-                    filtered.groupBy { it.city.orEmpty() }.entries.take(3).forEach { (city, ms) ->
-                        DText("$city · ${ms.size}", 12.sp, FontWeight.Bold, t.accent)
-                        ms.take(3).forEach { m -> DText(m.name, 14.sp, FontWeight.SemiBold, t.text, maxLines = 1) }
+                    CountryChips(countries, country) { selectedCountry ->
+                        country = selectedCountry
+                        selectedMosque = null
+                    }
+                    if (selected != null) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                DText(selected.name, 16.sp, FontWeight.ExtraBold, t.strong, maxLines = 1)
+                                DText(listOfNotNull(selected.city, selected.country).joinToString(" · "), 12.sp, FontWeight.Normal, t.muted, maxLines = 1)
+                            }
+                            Box(
+                                Modifier.height(38.dp).clip(RoundedCornerShape(19.dp)).background(t.primary)
+                                    .clickable { openDirections(context, selected) }.padding(horizontal = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Icon(Icons.Rounded.Directions, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    DText(stringResource(R.string.home_directions), 12.sp, FontWeight.ExtraBold, Color.White)
+                                }
+                            }
+                        }
+                    } else {
+                        DText(country ?: stringResource(R.string.common_all), 16.sp, FontWeight.ExtraBold, t.strong)
+                        filtered.groupBy { it.city.orEmpty() }.entries.take(3).forEach { (city, ms) ->
+                            DText("$city · ${ms.size}", 12.sp, FontWeight.Bold, t.accent)
+                            ms.take(3).forEach { m -> DText(m.name, 14.sp, FontWeight.SemiBold, t.text, maxLines = 1) }
+                        }
                     }
                 }
             }
@@ -326,7 +399,12 @@ internal fun WorldMosquesScreen(onBack: () -> Unit, viewModel: MosquesViewModel 
                     }
                 }
             }
-            item(span = { GridItemSpan(2) }) { CountryChips(countries, country) { country = it } }
+            item(span = { GridItemSpan(2) }) {
+                CountryChips(countries, country) {
+                    country = it
+                    selectedMosque = null
+                }
+            }
             if (featured != null && country == null && query.isBlank()) {
                 item(span = { GridItemSpan(2) }) {
                     Box(Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(24.dp)).clickable { openDirections(context, featured) }) {
@@ -386,4 +464,3 @@ private fun CountryChips(countries: List<String>, selected: String?, onSelect: (
         }
     }
 }
-

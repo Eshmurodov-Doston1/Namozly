@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="leaflet.css" />
+    <link rel="stylesheet" href="MarkerCluster.css" />
+    <link rel="stylesheet" href="MarkerCluster.Default.css" />
+    <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #F8F6F0;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .leaflet-control-attribution {
+            font-size: 9px !important;
+            background: rgba(255,255,255,0.7) !important;
+        }
+        /* Custom Mosque Marker */
+        .mosque-pin {
+            width: 32px;
+            height: 32px;
+            background: #0A3D33;
+            border: 2.5px solid #FFFFFF;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .mosque-pin.selected {
+            background: #D9A94F;
+            border-color: #0A3D33;
+            transform: rotate(-45deg) scale(1.25);
+            z-index: 1000 !important;
+        }
+        .mosque-pin-inner {
+            width: 12px;
+            height: 12px;
+            background: #F3C775;
+            border-radius: 50%;
+            transform: rotate(45deg);
+        }
+        .mosque-pin.selected .mosque-pin-inner {
+            background: #0A3D33;
+        }
+        /* Custom Cluster Marker */
+        .mosque-cluster {
+            background: linear-gradient(135deg, #0E5A4A, #0A3D33);
+            border: 3px solid #D9A94F;
+            border-radius: 50%;
+            color: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(10, 61, 51, 0.45);
+            transition: transform 0.2s ease;
+        }
+        .mosque-cluster:active {
+            transform: scale(0.92);
+        }
+        /* User location pin */
+        .user-pin {
+            width: 18px;
+            height: 18px;
+            background: #2563EB;
+            border: 3px solid #FFFFFF;
+            border-radius: 50%;
+            box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.25);
+        }
+        /* Popup Styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 16px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 4px;
+        }
+        .leaflet-popup-content {
+            margin: 10px 14px;
+            line-height: 1.4;
+        }
+        .popup-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #0A3D33;
+        }
+        .popup-sub {
+            font-size: 11px;
+            color: #6B7280;
+            margin-top: 2px;
+        }
+    </style>
+    <script src="leaflet.js"></script>
+    <script src="leaflet.markercluster.js"></script>
+</head>
+<body>
+<div id="map"></div>
+<script>
+    var map;
+    var clusterGroup;
+    var markersById = {};
+    var userMarker = null;
+    var selectedId = null;
+
+    function initMap(lat, lng, zoom, isClustered, isDark) {
+        if (map) return;
+        var center = [lat || 41.2995, lng || 69.2401];
+        map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false,
+            fadeAnimation: true,
+            zoomAnimation: true
+        }).setView(center, zoom || 13);
+
+        var tileUrl = isDark
+            ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+            : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+        L.tileLayer(tileUrl, {
+            maxZoom: 19,
+            subdomains: 'abc'
+        }).addTo(map);
+
+        if (isClustered) {
+            clusterGroup = L.markerClusterGroup({
+                maxClusterRadius: 55,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true,
+                iconCreateFunction: function(cluster) {
+                    var count = cluster.getChildCount();
+                    var size = count < 10 ? 38 : (count < 100 ? 44 : 50);
+                    var fontSize = count < 100 ? 14 : 12;
+                    return L.divIcon({
+                        html: '<div class="mosque-cluster" style="width:' + size + 'px;height:' + size + 'px;font-size:' + fontSize + 'px;">' + count + '</div>',
+                        className: '',
+                        iconSize: [size, size]
+                    });
+                }
+            });
+            map.addLayer(clusterGroup);
+        }
+
+        map.on('click', function(e) {
+            if (e.originalEvent && e.originalEvent.target && e.originalEvent.target.id === 'map') {
+                if (window.AndroidBridge && window.AndroidBridge.onMapClick) {
+                    window.AndroidBridge.onMapClick();
+                }
+            }
+        });
+
+        if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+            window.AndroidBridge.onMapReady();
+        }
+    }
+
+    function setUserLocation(lat, lng) {
+        if (!map) return;
+        var pos = [lat, lng];
+        if (userMarker) {
+            userMarker.setLatLng(pos);
+        } else {
+            var icon = L.divIcon({
+                className: '',
+                html: '<div class="user-pin"></div>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+            userMarker = L.marker(pos, { icon: icon, zIndexOffset: 2000 }).addTo(map);
+        }
+    }
+
+    function setMosques(itemsJson, selectId) {
+        if (!map) return;
+        var items = [];
+        try {
+            items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
+        } catch (e) {
+            return;
+        }
+
+        if (clusterGroup) {
+            clusterGroup.clearLayers();
+        } else {
+            for (var k in markersById) {
+                map.removeLayer(markersById[k]);
+            }
+        }
+        markersById = {};
+
+        var pinIcon = L.divIcon({
+            className: '',
+            html: '<div class="mosque-pin"><div class="mosque-pin-inner"></div></div>',
+            iconSize: [32, 32],
+            iconAnchor: [16, 30],
+            popupAnchor: [0, -28]
+        });
+
+        items.forEach(function(m) {
+            var marker = L.marker([m.lat, m.lng], { icon: pinIcon });
+            var popupHtml = '<div class="popup-title">' + (m.name || 'Masjid') + '</div>' +
+                            '<div class="popup-sub">' + [m.city, m.country].filter(Boolean).join(', ') + '</div>';
+            marker.bindPopup(popupHtml);
+
+            marker.on('click', function() {
+                highlightMosque(m.id);
+                if (window.AndroidBridge && window.AndroidBridge.onMosqueClick) {
+                    window.AndroidBridge.onMosqueClick(m.id);
+                }
+            });
+
+            markersById[m.id] = marker;
+            if (clusterGroup) {
+                clusterGroup.addLayer(marker);
+            } else {
+                marker.addTo(map);
+            }
+        });
+
+        if (selectId) {
+            highlightMosque(selectId);
+        }
+    }
+
+    function highlightMosque(id) {
+        selectedId = id;
+        for (var k in markersById) {
+            var marker = markersById[k];
+            var el = marker.getElement();
+            if (el) {
+                var pin = el.querySelector('.mosque-pin');
+                if (pin) {
+                    if (parseInt(k) === parseInt(id)) {
+                        pin.classList.add('selected');
+                    } else {
+                        pin.classList.remove('selected');
+                    }
+                }
+            }
+        }
+    }
+
+    function flyTo(lat, lng, zoom) {
+        if (!map) return;
+        map.flyTo([lat, lng], zoom || 15, { duration: 1.0 });
+    }
+
+    function zoomIn() {
+        if (map) map.zoomIn();
+    }
+
+    function zoomOut() {
+        if (map) map.zoomOut();
+    }
+</script>
+</body>
+</html>
