@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_channel_prayer">Namoz vaqtlari</string>
+    <string name="notif_channel_prayer_desc">Har bir namoz vaqti kirganda eslatma</string>
+    <string name="notif_channel_pre">Namozdan oldin ogohlantirish</string>
+    <string name="notif_channel_ramadan">Ramazon (saharlik va iftor)</string>
+    <string name="notif_prayer_title">%1$s vaqti kirdi</string>
+    <string name="notif_prayer_body">%1$s · %2$s</string>
+    <string name="notif_pre_title">%1$s vaqtiga %2$d daqiqa qoldi</string>
+    <string name="notif_pre_body">Tahoratga tayyorlaning</string>
+    <string name="notif_suhoor_title">Saharlik tugashiga %1$d daqiqa qoldi</string>
+    <string name="notif_iftar_title">Iftor vaqti bo\'ldi</string>
+    <string name="notif_iftar_body">Alloh ro\'zangizni qabul qilsin</string>
+    <string name="prayer_fajr">Bomdod</string>
+    <string name="prayer_sunrise">Quyosh chiqishi</string>
+    <string name="prayer_dhuhr">Peshin</string>
+    <string name="prayer_asr">Asr</string>
+    <string name="prayer_maghrib">Shom</string>
+    <string name="prayer_isha">Xufton</string>
+    <string name="prayer_jumuah">Juma</string>
+</resources>

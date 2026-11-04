@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Namozly logosi (dizayn: Main.dc.html): mehrob, hilol, oltin poydevor -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.62" android:scaleY="0.62" android:translateX="23" android:translateY="23">
+        <path android:fillColor="#F6F1E6" android:fillType="evenOdd"
+            android:pathData="M28,82 V48 C28,33 40,24 50,16 C60,24 72,33 72,48 V82 Z M57,43 A10,10 0 1,0 57,61 A9.5,9.5 0 0,1 57,43 Z" />
+        <path android:fillColor="#C9973F" android:pathData="M28,78 h44 v4 h-44 z" />
+    </group>
+</vector>

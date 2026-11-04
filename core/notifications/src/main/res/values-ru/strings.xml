@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_channel_prayer">Время намаза</string>
+    <string name="notif_channel_prayer_desc">Напоминание при наступлении каждого намаза</string>
+    <string name="notif_channel_pre">Предупреждение перед намазом</string>
+    <string name="notif_channel_ramadan">Рамадан (сухур и ифтар)</string>
+    <string name="notif_prayer_title">Наступило время намаза %1$s</string>
+    <string name="notif_prayer_body">%1$s · %2$s</string>
+    <string name="notif_pre_title">До намаза %1$s осталось %2$d мин</string>
+    <string name="notif_pre_body">Подготовьтесь к омовению</string>
+    <string name="notif_suhoor_title">До конца сухура осталось %1$d мин</string>
+    <string name="notif_iftar_title">Время ифтара</string>
+    <string name="notif_iftar_body">Пусть Аллах примет ваш пост</string>
+    <string name="prayer_fajr">Фаджр</string>
+    <string name="prayer_sunrise">Восход</string>
+    <string name="prayer_dhuhr">Зухр</string>
+    <string name="prayer_asr">Аср</string>
+    <string name="prayer_maghrib">Магриб</string>
+    <string name="prayer_isha">Иша</string>
+    <string name="prayer_jumuah">Джума</string>
+</resources>

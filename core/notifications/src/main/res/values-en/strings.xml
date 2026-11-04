@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_channel_prayer">Prayer times</string>
+    <string name="notif_channel_prayer_desc">Reminder when each prayer time begins</string>
+    <string name="notif_channel_pre">Before-prayer alert</string>
+    <string name="notif_channel_ramadan">Ramadan (suhoor and iftar)</string>
+    <string name="notif_prayer_title">It\'s time for %1$s</string>
+    <string name="notif_prayer_body">%1$s · %2$s</string>
+    <string name="notif_pre_title">%2$d min left until %1$s</string>
+    <string name="notif_pre_body">Get ready for wudu</string>
+    <string name="notif_suhoor_title">%1$d min left until suhoor ends</string>
+    <string name="notif_iftar_title">It\'s time for iftar</string>
+    <string name="notif_iftar_body">May Allah accept your fast</string>
+    <string name="prayer_fajr">Fajr</string>
+    <string name="prayer_sunrise">Sunrise</string>
+    <string name="prayer_dhuhr">Dhuhr</string>
+    <string name="prayer_asr">Asr</string>
+    <string name="prayer_maghrib">Maghrib</string>
+    <string name="prayer_isha">Isha</string>
+    <string name="prayer_jumuah">Jumu\'ah</string>
+</resources>
