@@ -20,7 +20,7 @@ android {
         applicationId = "uz.dostonbek.namozly"
         versionCode = 1
         versionName = "1.0.0"
-        buildConfigField("String", "YANDEX_MAPKIT_API_KEY", "\"${localProps.getProperty("YANDEX_MAPKIT_API_KEY", "")}\"")
+        buildConfigField("String", "YANDEX_MAPKIT_API_KEY", "\"${localProps.getProperty("YANDEX_MAPKIT_API_KEY", "1679252a-bd27-4314-9146-6634f6461607")}\"")
     }
 
     buildTypes {

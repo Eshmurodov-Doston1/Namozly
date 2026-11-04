@@ -77,4 +77,5 @@ data class Mosque(
     val photoUrl: String? = null,
     val city: String? = null,
     val country: String? = null,
+    val description: String? = null,
 )
